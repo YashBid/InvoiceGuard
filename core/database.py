@@ -26,7 +26,8 @@ def init_db():
             extraction_method TEXT,
             extraction_confidence REAL,
             processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            raw_json TEXT
+            raw_json TEXT,
+            UNIQUE (filename)
         );
 
         CREATE TABLE IF NOT EXISTS flags (
@@ -50,6 +51,10 @@ def init_db():
             unit TEXT,
             valid_from TEXT,
             valid_until TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS _demo_loaded (
+            id INTEGER PRIMARY KEY CHECK (id = 1)
         );
     """)
     conn.commit()
@@ -173,10 +178,15 @@ def _tables_empty() -> bool:
 
 
 def load_demo_data():
-    """Insert D2C personal care demo data. Only if tables are empty."""
-    if not _tables_empty():
-        return
+    """Insert D2C personal care demo data — atomic via _demo_loaded marker table."""
     conn = _get_conn()
+    try:
+        # Atomic guard: INSERT fails with IntegrityError if already loaded
+        conn.execute("INSERT INTO _demo_loaded (id) VALUES (1)")
+        conn.commit()
+    except Exception:
+        conn.close()
+        return  # already loaded — skip
 
     # ── Rate cards for 5 D2C vendors ──────────────────────────────────────────
     rate_card_rows = [
