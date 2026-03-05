@@ -1,6 +1,8 @@
 """InvoiceGuard — AI-powered invoice audit for Indian businesses."""
 import streamlit as st
 from core.database import init_db, load_demo_data
+init_db()
+load_demo_data()
 from core import extractor, llm_parser, validator, database, report_generator
 from core.ui import inject_css
 
