@@ -14,9 +14,9 @@ if not invoices:
     st.info("No invoices yet. Upload and process invoices from the main page.")
     st.stop()
 
-# Invoice selector — most recent first
+# Invoice selector — most recent first, ID shown for easy cross-reference
 options = {
-    f"{i.get('filename', 'Unknown')}  ({i.get('invoice_date', '—')})": i["id"]
+    f"#{i['id']} · {i.get('filename', 'Unknown')}  ({i.get('invoice_date', '—')})": i["id"]
     for i in reversed(invoices)
 }
 selected_label = st.selectbox("Select invoice", list(options.keys()))
