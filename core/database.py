@@ -165,11 +165,9 @@ def save_invoice(parsed: dict, flags: list, filename: str, extraction_method: st
     return invoice_id
 
 
-def load_demo_data():
-    """Insert D2C personal care demo data — always resets to clean state."""
+def reset_demo_data():
+    """Explicitly reset everything back to demo state — called only on demand."""
     conn = _get_conn()
-
-    # Always clear everything first for a clean reset
     conn.execute("DELETE FROM flags")
     conn.execute("DELETE FROM rate_cards")
     conn.execute("DELETE FROM invoices")
@@ -177,22 +175,24 @@ def load_demo_data():
     conn.execute("DELETE FROM sqlite_sequence WHERE name='rate_cards'")
     conn.execute("DELETE FROM sqlite_sequence WHERE name='invoices'")
     conn.commit()
+    conn.close()
+    load_demo_data()
+
+
+def load_demo_data():
+    """Insert D2C personal care demo data."""
+    conn = _get_conn()
 
     # ── Rate cards for 5 D2C vendors ──────────────────────────────────────────
     rate_card_rows = [
-        # GlowCraft Cosmetics — Contract manufacturer (CMO)
         ("GlowCraft Cosmetics Pvt Ltd", "Contract manufacturing per batch (skincare)", 45000.0, "batch", "2024-01-01", "2025-12-31"),
         ("GlowCraft Cosmetics Pvt Ltd", "Stability testing per SKU", 8000.0, "SKU", "2024-01-01", "2025-12-31"),
-        # PurePackage Solutions — Packaging supplier
         ("PurePackage Solutions", "HDPE bottle 200ml", 18.0, "unit", "2024-01-01", "2025-12-31"),
         ("PurePackage Solutions", "Airless pump bottle 50ml", 32.0, "unit", "2024-01-01", "2025-12-31"),
-        # NutraLabs India — Supplement / gummy manufacturer
         ("NutraLabs India Pvt Ltd", "Gummy manufacturing per batch", 55000.0, "batch", "2024-01-01", "2025-12-31"),
         ("NutraLabs India Pvt Ltd", "Capsule filling per 1000 units", 4500.0, "1000 units", "2024-01-01", "2025-12-31"),
-        # SwiftShip Logistics — 3PL / freight
         ("SwiftShip Logistics", "GTA freight per consignment", 3500.0, "trip", "2024-01-01", "2025-12-31"),
         ("SwiftShip Logistics", "Express courier per kg", 65.0, "kg", "2024-01-01", "2025-12-31"),
-        # GreenLeaf Extracts — Raw material supplier
         ("GreenLeaf Extracts Co.", "Aloe vera extract", 1200.0, "kg", "2024-01-01", "2025-12-31"),
         ("GreenLeaf Extracts Co.", "Rose essential oil", 8500.0, "kg", "2024-01-01", "2025-12-31"),
     ]
@@ -204,27 +204,22 @@ def load_demo_data():
 
     # ── 20 invoices ───────────────────────────────────────────────────────────
     invoices_data = [
-        # GlowCraft Cosmetics — CMO invoices
         ("GlowCraft_INV-GC-2024-001_Mar2024.pdf",  "GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-001", "2024-03-10", 135000.0, "pdfplumber", 0.96),
         ("GlowCraft_INV-GC-2024-002_Mar2024.pdf",  "GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-002", "2024-03-28", 135000.0, "pdfplumber", 0.95),
         ("GlowCraft_INV-GC-2024-003_Ayurvedic.pdf","GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-003", "2024-04-15", 97500.0,  "pdfplumber", 0.94),
         ("GlowCraft_INV-GC-2024-004_May2024.pdf",  "GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-004", "2024-05-20", 96000.0,  "pdfplumber", 0.97),
-        # PurePackage Solutions — Packaging invoices
         ("PurePackage_PP-INV-2401_HDPE_Bottles.pdf",   "PurePackage Solutions", "29AABCP5678R1Z9", "PP/INV/2401", "2024-03-05", 54500.0, "pdfplumber", 0.97),
         ("PurePackage_PP-INV-2402_AirlessPumps.pdf",   "PurePackage Solutions", "29AABCP5678R1Z9", "PP/INV/2402", "2024-04-02", 38400.0, "pdfplumber", 0.94),
         ("PurePackage_PP-INV-2403_Labels_Cartons.pdf", "PurePackage Solutions", "29AABCP5678R1Z9", "PP/INV/2403", "2024-04-20", 65200.0, "pdfplumber", 0.96),
         ("PurePackage_PP-INV-2404_PumpBottles.pdf",    "PurePackage Solutions", "29AABCP5678R1Z9", "PP/INV/2404", "2024-05-28", 35000.0, "vision",    0.86),
-        # NutraLabs India — Supplement / gummy invoices
         ("NutraLabs_NL-2024-0301_GummyBatch.pdf",    "NutraLabs India Pvt Ltd", "06AABCN9012R1Z3", "NL-2024-0301", "2024-03-15", 113500.0, "vision",    0.89),
         ("NutraLabs_NL-2024-0302_Capsules.pdf",      "NutraLabs India Pvt Ltd", "06AABCN9012R1Z3", "NL-2024-0302", "2024-04-10",  50000.0, "pdfplumber", 0.93),
         ("NutraLabs_NL-2024-0303_GummyBatch2.pdf",   "NutraLabs India Pvt Ltd", "06AABCN9012R1Z3", "NL-2024-0303", "2024-05-05", 126500.0, "vision",    0.88),
         ("NutraLabs_NL-2024-0304_Supplements.pdf",   "NutraLabs India Pvt Ltd", "06AABCN9012R1Z3", "NL-2024-0304", "2024-06-02",  67500.0, "pdfplumber", 0.95),
-        # SwiftShip Logistics — Freight invoices
         ("SwiftShip_SS24-001_Freight_Mar.pdf", "SwiftShip Logistics", "33AABCS3456R1Z7", "SS/24/001", "2024-03-08", 18880.0, "pdfplumber", 0.92),
         ("SwiftShip_SS24-002_Courier_Mar.pdf", "SwiftShip Logistics", "33AABCS3456R1Z7", "SS/24/002", "2024-03-22",  8450.0, "vision",    0.87),
         ("SwiftShip_SS24-003_Freight_May.pdf", "SwiftShip Logistics", "33AABCS3456R1Z7", "SS/24/003", "2024-05-12", 14200.0, "pdfplumber", 0.91),
         ("SwiftShip_SS24-004_Freight_Jun.pdf", "SwiftShip Logistics", "33AABCS3456R1Z7", "SS/24/004", "2024-06-10", 23000.0, "pdfplumber", 0.92),
-        # GreenLeaf Extracts — Raw material invoices
         ("GreenLeaf_GL-2401_AloeVera_50kg.pdf",    "GreenLeaf Extracts Co.", "24AABCG7890R1Z1", "GL-INV-2401", "2024-03-12", 60000.0, "pdfplumber", 0.95),
         ("GreenLeaf_GL-2402_RoseOil_10kg.pdf",     "GreenLeaf Extracts Co.", "24AABCG7890R1Z1", "GL-INV-2402", "2024-04-01", 85000.0, "pdfplumber", 0.97),
         ("GreenLeaf_GL-2403_AloeVera_20kg.pdf",    "GreenLeaf Extracts Co.", "24AABCG7890R1Z1", "GL-INV-2403", "2024-05-08", 27000.0, "pdfplumber", 0.93),
@@ -239,21 +234,16 @@ def load_demo_data():
 
     # ── 14 flags across all 5 types ───────────────────────────────────────────
     flags_demo = [
-        # DUPLICATE_INVOICE
         (2,  "DUPLICATE_INVOICE",   "Possible duplicate of INV-GC-2024-001 from 2024-03-10 — same CMO, same amount ₹1,35,000",                              135000.0, 0.0,    135000.0, "critical"),
-        # GST_MISMATCH
         (13, "GST_MISMATCH",        "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹2,081",                                      18880.0,  16799.0, 2081.0, "warning"),
         (15, "GST_MISMATCH",        "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹1,573",                                      14200.0,  12627.0, 1573.0, "warning"),
         (3,  "GST_MISMATCH",        "Ayurvedic skincare batch (HSN 3003) billed at 18% GST; correct rate is 12% — excess tax ₹4,958",                        97500.0,  92542.0, 4958.0, "warning"),
-        # RATE_EXCEEDED
         (4,  "RATE_EXCEEDED",       "Contract manufacturing billed at ₹48,000/batch vs contracted ₹45,000/batch (2 batches) — overcharge ₹6,000",            96000.0,  90000.0, 6000.0, "warning"),
         (8,  "RATE_EXCEEDED",       "Airless pump bottle 50ml billed at ₹35/unit vs contracted ₹32/unit (1,000 units) — overcharge ₹3,000",                  35000.0,  32000.0, 3000.0, "warning"),
         (19, "RATE_EXCEEDED",       "Aloe vera extract billed at ₹1,350/kg vs contracted ₹1,200/kg (20 kg) — overcharge ₹3,000",                             27000.0,  24000.0, 3000.0, "warning"),
-        # CALCULATION_ERROR
         (5,  "CALCULATION_ERROR",   "HDPE bottle 200ml: 3,000 × ₹18 should be ₹54,000 not ₹54,500 — arithmetic error ₹500",                                 54500.0,  54000.0, 500.0,  "warning"),
         (9,  "CALCULATION_ERROR",   "Gummy manufacturing: 2 batches × ₹55,000 = ₹1,10,000 not ₹1,13,500 — overcharged ₹3,500",                             113500.0, 110000.0, 3500.0, "warning"),
         (7,  "CALCULATION_ERROR",   "Label printing: 10,000 units × ₹0.85 = ₹8,500 not ₹9,200 — billing error ₹700",                                         9200.0,   8500.0,  700.0,  "warning"),
-        # MYSTERY_SURCHARGE
         (10, "MYSTERY_SURCHARGE",   "Surcharge 'Artwork development charges' ₹5,000 not found in rate card or contract with NutraLabs",                        5000.0,   0.0,    5000.0, "warning"),
         (11, "MYSTERY_SURCHARGE",   "Surcharge 'Formula development fee' ₹15,000 not found in contract with NutraLabs — query before payment",               15000.0,   0.0,   15000.0, "warning"),
         (16, "MYSTERY_SURCHARGE",   "Surcharge 'Fuel surcharge' ₹2,000 not in rate card for SwiftShip Logistics",                                             2000.0,   0.0,    2000.0, "warning"),
@@ -271,4 +261,10 @@ def load_demo_data():
 
 # Ensure tables exist whenever any page imports this module
 init_db()
-load_demo_data()
+
+# Only load demo data if DB is completely empty
+_conn = _get_conn()
+_count = _conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
+_conn.close()
+if _count == 0:
+    load_demo_data()
