@@ -205,6 +205,4 @@ def load_demo_data():
     conn.close()
 
 
-# Run on import
-init_db()
-load_demo_data()
+
