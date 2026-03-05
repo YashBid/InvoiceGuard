@@ -211,7 +211,13 @@ def load_demo_data():
             "INSERT INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)",
             r,
         )
-
+conn.execute("DELETE FROM flags")
+    conn.execute("DELETE FROM rate_cards")
+    conn.execute("DELETE FROM invoices")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='invoices'")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='flags'")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='rate_cards'")
+    conn.commit()
     # ── 20 invoices ───────────────────────────────────────────────────────────
     invoices_data = [
         # GlowCraft Cosmetics — CMO invoices
