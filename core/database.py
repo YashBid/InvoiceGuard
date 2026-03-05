@@ -39,7 +39,8 @@ def init_db():
             overcharge REAL,
             severity TEXT,
             status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(invoice_id, flag_type, description)
         );
         CREATE TABLE IF NOT EXISTS rate_cards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +49,8 @@ def init_db():
             unit_rate REAL,
             unit TEXT,
             valid_from TEXT,
-            valid_until TEXT
+            valid_until TEXT,
+            UNIQUE(vendor_name, item_description)
         );
     """)
     conn.commit()
@@ -94,7 +96,7 @@ def insert_rate_cards(rows: list) -> None:
     conn = _get_conn()
     for r in rows:
         conn.execute(
-            "INSERT INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)",
             (r.get("vendor_name"), r.get("item_description"), float(r.get("unit_rate", 0)), str(r.get("unit", "")), str(r.get("valid_from", "")), str(r.get("valid_until", "")))
         )
     conn.commit()
@@ -110,7 +112,7 @@ def save_invoice(parsed: dict, flags: list, filename: str, extraction_method: st
     invoice_id = cur.lastrowid
     for f in flags:
         conn.execute(
-            "INSERT INTO flags (invoice_id, flag_type, description, billed_amount, correct_amount, overcharge, severity) VALUES (?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO flags (invoice_id, flag_type, description, billed_amount, correct_amount, overcharge, severity) VALUES (?,?,?,?,?,?,?)",
             (invoice_id, f["flag_type"], f["description"], f["billed_amount"], f["correct_amount"], f["overcharge"], f["severity"])
         )
     conn.commit()
@@ -118,21 +120,11 @@ def save_invoice(parsed: dict, flags: list, filename: str, extraction_method: st
     return invoice_id
 
 
-def _is_empty() -> bool:
-    conn = _get_conn()
-    count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
-    conn.close()
-    return count == 0
-
-
 def load_demo_data():
-    """Load demo data ONLY if database is empty."""
-    if not _is_empty():
-        return  # already has data — do nothing
-
+    """Load demo data — INSERT OR IGNORE means safe to call multiple times simultaneously."""
     conn = _get_conn()
 
-    # Rate cards
+    # Rate cards — UNIQUE(vendor_name, item_description) prevents duplicates
     rate_cards = [
         ("GlowCraft Cosmetics Pvt Ltd", "Contract manufacturing per batch (skincare)", 45000.0, "batch", "2024-01-01", "2025-12-31"),
         ("GlowCraft Cosmetics Pvt Ltd", "Stability testing per SKU", 8000.0, "SKU", "2024-01-01", "2025-12-31"),
@@ -146,9 +138,9 @@ def load_demo_data():
         ("GreenLeaf Extracts Co.", "Rose essential oil", 8500.0, "kg", "2024-01-01", "2025-12-31"),
     ]
     for r in rate_cards:
-        conn.execute("INSERT INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)", r)
+        conn.execute("INSERT OR IGNORE INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)", r)
 
-    # 20 invoices
+    # 20 invoices — UNIQUE(filename) prevents duplicates
     invoices = [
         ("GlowCraft_INV-GC-2024-001_Mar2024.pdf",  "GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-001", "2024-03-10", 135000.0, "pdfplumber", 0.96),
         ("GlowCraft_INV-GC-2024-002_Mar2024.pdf",  "GlowCraft Cosmetics Pvt Ltd", "27AABCG1234R1Z5", "INV-GC-2024-002", "2024-03-28", 135000.0, "pdfplumber", 0.95),
@@ -172,32 +164,47 @@ def load_demo_data():
         ("GreenLeaf_GL-2404_EssentialOils_Jun.pdf","GreenLeaf Extracts Co.", "24AABCG7890R1Z1", "GL-INV-2404", "2024-06-15", 45500.0, "vision",    0.88),
     ]
     for inv in invoices:
-        conn.execute("INSERT INTO invoices (filename, vendor_name, vendor_gstin, invoice_number, invoice_date, grand_total, extraction_method, extraction_confidence, raw_json) VALUES (?,?,?,?,?,?,?,?,'{}') ", inv)
+        conn.execute("INSERT OR IGNORE INTO invoices (filename, vendor_name, vendor_gstin, invoice_number, invoice_date, grand_total, extraction_method, extraction_confidence, raw_json) VALUES (?,?,?,?,?,?,?,?,'{}') ", inv)
 
-    # 14 flags
-    flags = [
-        (2,  "DUPLICATE_INVOICE",  "Possible duplicate of INV-GC-2024-001 from 2024-03-10 — same CMO, same amount ₹1,35,000",                         135000.0,    0.0, 135000.0, "critical"),
-        (13, "GST_MISMATCH",       "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹2,081",                                 18880.0, 16799.0,   2081.0, "warning"),
-        (15, "GST_MISMATCH",       "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹1,573",                                 14200.0, 12627.0,   1573.0, "warning"),
-        (3,  "GST_MISMATCH",       "Ayurvedic skincare batch (HSN 3003) billed at 18% GST; correct rate is 12% — excess tax ₹4,958",                   97500.0, 92542.0,   4958.0, "warning"),
-        (4,  "RATE_EXCEEDED",      "Contract manufacturing billed at ₹48,000/batch vs contracted ₹45,000/batch (2 batches) — overcharge ₹6,000",       96000.0, 90000.0,   6000.0, "warning"),
-        (8,  "RATE_EXCEEDED",      "Airless pump bottle 50ml billed at ₹35/unit vs contracted ₹32/unit (1,000 units) — overcharge ₹3,000",             35000.0, 32000.0,   3000.0, "warning"),
-        (19, "RATE_EXCEEDED",      "Aloe vera extract billed at ₹1,350/kg vs contracted ₹1,200/kg (20 kg) — overcharge ₹3,000",                        27000.0, 24000.0,   3000.0, "warning"),
-        (5,  "CALCULATION_ERROR",  "HDPE bottle 200ml: 3,000 × ₹18 should be ₹54,000 not ₹54,500 — arithmetic error ₹500",                            54500.0, 54000.0,    500.0, "warning"),
-        (9,  "CALCULATION_ERROR",  "Gummy manufacturing: 2 batches × ₹55,000 = ₹1,10,000 not ₹1,13,500 — overcharged ₹3,500",                        113500.0,110000.0,   3500.0, "warning"),
-        (7,  "CALCULATION_ERROR",  "Label printing: 10,000 units × ₹0.85 = ₹8,500 not ₹9,200 — billing error ₹700",                                    9200.0,  8500.0,    700.0, "warning"),
-        (10, "MYSTERY_SURCHARGE",  "Surcharge 'Artwork development charges' ₹5,000 not found in rate card or contract with NutraLabs",                  5000.0,     0.0,   5000.0, "warning"),
-        (11, "MYSTERY_SURCHARGE",  "Surcharge 'Formula development fee' ₹15,000 not found in contract with NutraLabs — query before payment",          15000.0,     0.0,  15000.0, "warning"),
-        (16, "MYSTERY_SURCHARGE",  "Surcharge 'Fuel surcharge' ₹2,000 not in rate card for SwiftShip Logistics",                                        2000.0,     0.0,   2000.0, "warning"),
-        (20, "MYSTERY_SURCHARGE",  "Surcharge 'Cold storage handling' ₹3,500 not in contract with GreenLeaf Extracts",                                  3500.0,     0.0,   3500.0, "warning"),
+    conn.commit()
+
+    # Flags need invoice IDs from DB after insert
+    # Fetch IDs by filename to get correct IDs regardless of order
+    id_map = {}
+    for inv in invoices:
+        row = conn.execute("SELECT id FROM invoices WHERE filename = ?", (inv[0],)).fetchone()
+        if row:
+            id_map[inv[0]] = row[0]
+
+    demo_flags = [
+        ("GlowCraft_INV-GC-2024-002_Mar2024.pdf",  "DUPLICATE_INVOICE",  "Possible duplicate of INV-GC-2024-001 from 2024-03-10 — same CMO, same amount ₹1,35,000",                         135000.0,    0.0, 135000.0, "critical"),
+        ("SwiftShip_SS24-001_Freight_Mar.pdf",      "GST_MISMATCH",       "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹2,081",                                18880.0, 16799.0,   2081.0, "warning"),
+        ("SwiftShip_SS24-003_Freight_May.pdf",      "GST_MISMATCH",       "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹1,573",                                14200.0, 12627.0,   1573.0, "warning"),
+        ("GlowCraft_INV-GC-2024-003_Ayurvedic.pdf","GST_MISMATCH",       "Ayurvedic skincare batch (HSN 3003) billed at 18% GST; correct rate is 12% — excess tax ₹4,958",                  97500.0, 92542.0,   4958.0, "warning"),
+        ("GlowCraft_INV-GC-2024-004_May2024.pdf",  "RATE_EXCEEDED",      "Contract manufacturing billed at ₹48,000/batch vs contracted ₹45,000/batch (2 batches) — overcharge ₹6,000",      96000.0, 90000.0,   6000.0, "warning"),
+        ("PurePackage_PP-INV-2404_PumpBottles.pdf", "RATE_EXCEEDED",      "Airless pump bottle 50ml billed at ₹35/unit vs contracted ₹32/unit (1,000 units) — overcharge ₹3,000",            35000.0, 32000.0,   3000.0, "warning"),
+        ("GreenLeaf_GL-2403_AloeVera_20kg.pdf",    "RATE_EXCEEDED",      "Aloe vera extract billed at ₹1,350/kg vs contracted ₹1,200/kg (20 kg) — overcharge ₹3,000",                       27000.0, 24000.0,   3000.0, "warning"),
+        ("PurePackage_PP-INV-2401_HDPE_Bottles.pdf","CALCULATION_ERROR",  "HDPE bottle 200ml: 3,000 × ₹18 should be ₹54,000 not ₹54,500 — arithmetic error ₹500",                           54500.0, 54000.0,    500.0, "warning"),
+        ("NutraLabs_NL-2024-0301_GummyBatch.pdf",  "CALCULATION_ERROR",  "Gummy manufacturing: 2 batches × ₹55,000 = ₹1,10,000 not ₹1,13,500 — overcharged ₹3,500",                       113500.0,110000.0,   3500.0, "warning"),
+        ("PurePackage_PP-INV-2403_Labels_Cartons.pdf","CALCULATION_ERROR","Label printing: 10,000 units × ₹0.85 = ₹8,500 not ₹9,200 — billing error ₹700",                                   9200.0,  8500.0,    700.0, "warning"),
+        ("NutraLabs_NL-2024-0302_Capsules.pdf",    "MYSTERY_SURCHARGE",  "Surcharge 'Artwork development charges' ₹5,000 not found in rate card or contract with NutraLabs",                  5000.0,    0.0,   5000.0, "warning"),
+        ("NutraLabs_NL-2024-0303_GummyBatch2.pdf", "MYSTERY_SURCHARGE",  "Surcharge 'Formula development fee' ₹15,000 not found in contract with NutraLabs — query before payment",         15000.0,    0.0,  15000.0, "warning"),
+        ("SwiftShip_SS24-004_Freight_Jun.pdf",     "MYSTERY_SURCHARGE",  "Surcharge 'Fuel surcharge' ₹2,000 not in rate card for SwiftShip Logistics",                                        2000.0,    0.0,   2000.0, "warning"),
+        ("GreenLeaf_GL-2404_EssentialOils_Jun.pdf","MYSTERY_SURCHARGE",  "Surcharge 'Cold storage handling' ₹3,500 not in contract with GreenLeaf Extracts",                                  3500.0,    0.0,   3500.0, "warning"),
     ]
-    for f in flags:
-        conn.execute("INSERT INTO flags (invoice_id, flag_type, description, billed_amount, correct_amount, overcharge, severity) VALUES (?,?,?,?,?,?,?)", f)
+    for f in demo_flags:
+        filename, flag_type, description, billed, correct, overcharge, severity = f
+        invoice_id = id_map.get(filename)
+        if invoice_id:
+            conn.execute(
+                "INSERT OR IGNORE INTO flags (invoice_id, flag_type, description, billed_amount, correct_amount, overcharge, severity) VALUES (?,?,?,?,?,?,?)",
+                (invoice_id, flag_type, description, billed, correct, overcharge, severity)
+            )
 
     conn.commit()
     conn.close()
 
 
-# Run once on import
+# Run on import
 init_db()
 load_demo_data()
