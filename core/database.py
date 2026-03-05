@@ -52,10 +52,6 @@ def init_db():
             valid_from TEXT,
             valid_until TEXT
         );
-
-        CREATE TABLE IF NOT EXISTS _demo_loaded (
-            id INTEGER PRIMARY KEY CHECK (id = 1)
-        );
     """)
     conn.commit()
     conn.close()
@@ -169,24 +165,18 @@ def save_invoice(parsed: dict, flags: list, filename: str, extraction_method: st
     return invoice_id
 
 
-
-def _tables_empty() -> bool:
-    conn = _get_conn()
-    count = conn.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
-    conn.close()
-    return count == 0
-
-
 def load_demo_data():
-    """Insert D2C personal care demo data — atomic via _demo_loaded marker table."""
+    """Insert D2C personal care demo data — always resets to clean state."""
     conn = _get_conn()
-    try:
-        # Atomic guard: INSERT fails with IntegrityError if already loaded
-        conn.execute("INSERT INTO _demo_loaded (id) VALUES (1)")
-        conn.commit()
-    except Exception:
-        conn.close()
-        return  # already loaded — skip
+
+    # Always clear everything first for a clean reset
+    conn.execute("DELETE FROM flags")
+    conn.execute("DELETE FROM rate_cards")
+    conn.execute("DELETE FROM invoices")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='flags'")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='rate_cards'")
+    conn.execute("DELETE FROM sqlite_sequence WHERE name='invoices'")
+    conn.commit()
 
     # ── Rate cards for 5 D2C vendors ──────────────────────────────────────────
     rate_card_rows = [
@@ -211,13 +201,7 @@ def load_demo_data():
             "INSERT INTO rate_cards (vendor_name, item_description, unit_rate, unit, valid_from, valid_until) VALUES (?,?,?,?,?,?)",
             r,
         )
-conn.execute("DELETE FROM flags")
-    conn.execute("DELETE FROM rate_cards")
-    conn.execute("DELETE FROM invoices")
-    conn.execute("DELETE FROM sqlite_sequence WHERE name='invoices'")
-    conn.execute("DELETE FROM sqlite_sequence WHERE name='flags'")
-    conn.execute("DELETE FROM sqlite_sequence WHERE name='rate_cards'")
-    conn.commit()
+
     # ── 20 invoices ───────────────────────────────────────────────────────────
     invoices_data = [
         # GlowCraft Cosmetics — CMO invoices
@@ -254,14 +238,12 @@ conn.execute("DELETE FROM flags")
         """, inv)
 
     # ── 14 flags across all 5 types ───────────────────────────────────────────
-    # invoice_id matches insertion order above (1-indexed)
     flags_demo = [
         # DUPLICATE_INVOICE
         (2,  "DUPLICATE_INVOICE",   "Possible duplicate of INV-GC-2024-001 from 2024-03-10 — same CMO, same amount ₹1,35,000",                              135000.0, 0.0,    135000.0, "critical"),
-        # GST_MISMATCH — GTA freight incorrectly charged at 18% instead of 5%
+        # GST_MISMATCH
         (13, "GST_MISMATCH",        "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹2,081",                                      18880.0,  16799.0, 2081.0, "warning"),
         (15, "GST_MISMATCH",        "GTA freight (HSN 9965) billed at 18% GST; correct rate is 5% — excess tax ₹1,573",                                      14200.0,  12627.0, 1573.0, "warning"),
-        # GST_MISMATCH — Ayurvedic batch at 18% instead of 12%
         (3,  "GST_MISMATCH",        "Ayurvedic skincare batch (HSN 3003) billed at 18% GST; correct rate is 12% — excess tax ₹4,958",                        97500.0,  92542.0, 4958.0, "warning"),
         # RATE_EXCEEDED
         (4,  "RATE_EXCEEDED",       "Contract manufacturing billed at ₹48,000/batch vs contracted ₹45,000/batch (2 batches) — overcharge ₹6,000",            96000.0,  90000.0, 6000.0, "warning"),
@@ -271,7 +253,7 @@ conn.execute("DELETE FROM flags")
         (5,  "CALCULATION_ERROR",   "HDPE bottle 200ml: 3,000 × ₹18 should be ₹54,000 not ₹54,500 — arithmetic error ₹500",                                 54500.0,  54000.0, 500.0,  "warning"),
         (9,  "CALCULATION_ERROR",   "Gummy manufacturing: 2 batches × ₹55,000 = ₹1,10,000 not ₹1,13,500 — overcharged ₹3,500",                             113500.0, 110000.0, 3500.0, "warning"),
         (7,  "CALCULATION_ERROR",   "Label printing: 10,000 units × ₹0.85 = ₹8,500 not ₹9,200 — billing error ₹700",                                         9200.0,   8500.0,  700.0,  "warning"),
-        # MYSTERY_SURCHARGE — common in D2C personal care industry
+        # MYSTERY_SURCHARGE
         (10, "MYSTERY_SURCHARGE",   "Surcharge 'Artwork development charges' ₹5,000 not found in rate card or contract with NutraLabs",                        5000.0,   0.0,    5000.0, "warning"),
         (11, "MYSTERY_SURCHARGE",   "Surcharge 'Formula development fee' ₹15,000 not found in contract with NutraLabs — query before payment",               15000.0,   0.0,   15000.0, "warning"),
         (16, "MYSTERY_SURCHARGE",   "Surcharge 'Fuel surcharge' ₹2,000 not in rate card for SwiftShip Logistics",                                             2000.0,   0.0,    2000.0, "warning"),
@@ -289,3 +271,4 @@ conn.execute("DELETE FROM flags")
 
 # Ensure tables exist whenever any page imports this module
 init_db()
+load_demo_data()
