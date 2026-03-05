@@ -1,0 +1,24 @@
+# Python / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets — never commit these
+.env
+*.env
+
+# Database — ephemeral on cloud, no need to commit
+data/invoiceguard.db
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Streamlit local cache
+.streamlit/secrets.toml

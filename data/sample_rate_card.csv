@@ -1,0 +1,11 @@
+vendor_name,item_description,unit_rate,unit,valid_from,valid_until
+GlowCraft Cosmetics Pvt Ltd,Contract manufacturing per batch (skincare),45000,batch,2024-01-01,2025-12-31
+GlowCraft Cosmetics Pvt Ltd,Stability testing per SKU,8000,SKU,2024-01-01,2025-12-31
+PurePackage Solutions,HDPE bottle 200ml,18,unit,2024-01-01,2025-12-31
+PurePackage Solutions,Airless pump bottle 50ml,32,unit,2024-01-01,2025-12-31
+NutraLabs India Pvt Ltd,Gummy manufacturing per batch,55000,batch,2024-01-01,2025-12-31
+NutraLabs India Pvt Ltd,Capsule filling per 1000 units,4500,1000 units,2024-01-01,2025-12-31
+SwiftShip Logistics,GTA freight per consignment,3500,trip,2024-01-01,2025-12-31
+SwiftShip Logistics,Express courier per kg,65,kg,2024-01-01,2025-12-31
+GreenLeaf Extracts Co.,Aloe vera extract,1200,kg,2024-01-01,2025-12-31
+GreenLeaf Extracts Co.,Rose essential oil,8500,kg,2024-01-01,2025-12-31
