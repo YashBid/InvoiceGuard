@@ -210,7 +210,7 @@ def insert_rate_cards(rows: list) -> None:
 def save_invoice(parsed: dict, flags: list, filename: str, extraction_method: str) -> int:
     conn = _get_conn()
     cur = conn.execute(
-        "INSERT OR IGNORE INTO invoices (filename, vendor_name, vendor_gstin, invoice_number, invoice_date, grand_total, extraction_method, extraction_confidence, raw_json) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT OR REPLACE INTO invoices (filename, vendor_name, vendor_gstin, invoice_number, invoice_date, grand_total, extraction_method, extraction_confidence, raw_json) VALUES (?,?,?,?,?,?,?,?,?)",
         (filename, parsed.get("vendor_name"), parsed.get("vendor_gstin"), parsed.get("invoice_number"),
          parsed.get("invoice_date"), parsed.get("grand_total"), extraction_method,
          parsed.get("extraction_confidence"), json.dumps(parsed))
