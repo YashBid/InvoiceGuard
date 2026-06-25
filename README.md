@@ -1,5 +1,4 @@
-<div align="center">
-  <img src="https://img.icons8.com/color/96/000000/shield.png" alt="InvoiceGuard Logo" width="100"/>
+
   <h1>🛡️ InvoiceGuard</h1>
   <p><strong>AI-powered invoice audit system for D2C Personal Care & Health Products brands.</strong></p>
 
@@ -20,7 +19,7 @@
 Whether it's overcharges, GST calculation errors, duplicate submissions, or mystery surcharges, InvoiceGuard catches them all.
 
 ### ✨ Key Features
-- **Intelligent Extraction:** Uses advanced LLMs (Groq `llama-3.3-70b-versatile` & Mistral `pixtral-12b-2409`) to extract data from digital PDFs, PNGs, JPGs, TIFFs, and WEBPs.
+- **Intelligent Extraction:** Uses advanced LLMs to extract data from digital PDFs, PNGs, JPGs, TIFFs, and WEBPs.
 - **GST & Rate Auditing:** Automatically cross-checks extracted invoice details against predefined rate cards and GST rules.
 - **Robust Flagging:** Instantly identifies duplicates, calculation mismatches, and overcharges.
 - **Export & Reporting:** Generate comprehensive Excel audit reports with a single click.
@@ -57,10 +56,6 @@ Launch the Streamlit server:
 streamlit run app.py
 ```
 
----
-
-
----
 
 ## 🛠️ Tech Stack
 
@@ -71,7 +66,7 @@ streamlit run app.py
 - **Database:** SQLite
 - **Data Visualization:** Plotly
 
----
+
 ---
 
 <div align="center">
